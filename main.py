@@ -72,3 +72,16 @@ def LoadPL(filename):
         b.append(int(right.strip()))
 
     MATRIX = np.hstack((np.array(coef, dtype=int), np.array(b, dtype=int).reshape(-1, 1)))
+
+def ExtendTableau():
+    objective_row = np.concatenate((
+            np.zeros(RESTRICTIONS_COUNT),
+            OBJ_COEFFICIENTS * -1,
+            [0]
+        ))
+
+    identity_matrix = np.eye(RESTRICTIONS_COUNT, dtype=int)
+    extended_matrix = np.hstack((identity_matrix, MATRIX))
+    extended_matrix = np.vstack((objective_row, extended_matrix))
+
+    return extended_matrix
