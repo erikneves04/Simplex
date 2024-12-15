@@ -85,3 +85,32 @@ def ExtendTableau():
     extended_matrix = np.vstack((objective_row, extended_matrix))
 
     return extended_matrix
+
+def PrintTableau(tableau, decimals=3, digits=7):
+    rows, cols = tableau.shape
+    left_cols = rows - 1
+    main_cols = cols - left_cols - 1
+
+    format_string = f"{{:>{digits}.{decimals}f}}"
+    def format_row(row):
+        left_part = " | ".join(format_string.format(row[j]) for j in range(left_cols))
+        main_part = " | ".join(format_string.format(row[j + left_cols]) for j in range(main_cols))
+        rhs_part = format_string.format(row[-1]) 
+        return f"{left_part} || {main_part} || {rhs_part}"
+
+    formatted_rows = [format_row(tableau[i, :]) for i in range(rows)]
+    line_separator = "=" * len(formatted_rows[0])
+
+    table = [line_separator] + [formatted_rows[0]] + [line_separator] + formatted_rows[1:] + [line_separator]
+    
+    print("\n".join(table))
+
+def main():
+    args = parseArgs()
+
+    LoadPL(args.input)
+    extended = ExtendTableau()
+    PrintTableau(extended, decimals=3, digits=7)
+
+if __name__ == "__main__":
+    main() 
