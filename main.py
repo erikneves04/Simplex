@@ -21,6 +21,7 @@ class TypesOfRestrictions(Enum):
         return self.value
 
 # Variáveis de controle
+ORIGINAL_VAR_COUNT = 0
 VAR_COUNT = 0
 VAR_TYPES = []
 OBJ_COEFFICIENTS = []
@@ -28,6 +29,7 @@ RESTRICTIONS_COUNT = 0
 RESTRICTIONS_TYPE = []
 MATRIX = None # inclui o vetor b a direita
 IS_MAXIMIZATION = False
+SOLUTION_GETTERS = None
 
 def parseArgs():
     parser = argparse.ArgumentParser(description="Aplicação solução de problemas de programação linear usando o simplex")
@@ -38,12 +40,13 @@ def parseArgs():
     return parser.parse_args()
 
 def LoadPL(filename):
-    global VAR_COUNT, RESTRICTIONS_COUNT, VAR_TYPES, OBJ_COEFFICIENTS, RESTRICTIONS_TYPE, MATRIX, IS_MAXIMIZATION
+    global VAR_COUNT, ORIGINAL_VAR_COUNT, RESTRICTIONS_COUNT, VAR_TYPES, OBJ_COEFFICIENTS, RESTRICTIONS_TYPE, MATRIX, IS_MAXIMIZATION
 
     with open(filename, "r") as file:
         lines = file.readlines()
 
     VAR_COUNT = int(lines[0].strip())
+    ORIGINAL_VAR_COUNT = VAR_COUNT
     RESTRICTIONS_COUNT = int(lines[1].strip())
 
     varTypes = list(map(int, lines[2].strip().split()))
@@ -72,6 +75,9 @@ def LoadPL(filename):
             RESTRICTIONS_TYPE.append(TypesOfRestrictions.GreaterThanOrEqual)
         elif "==" in line:
             left, right = line.split("==")
+            RESTRICTIONS_TYPE.append(TypesOfRestrictions.Equal)
+        elif "=" in line:
+            left, right = line.split("=")
             RESTRICTIONS_TYPE.append(TypesOfRestrictions.Equal)
         
         coef.append(list(map(int, left.strip().split())))
@@ -111,12 +117,78 @@ def PrintTableau(tableau, decimals, digits):
     
     print("\n".join(table))
 
+def ConvertToFPI():
+    global MATRIX, OBJ_COEFFICIENTS, IS_MAXIMIZATION, VAR_COUNT, VAR_TYPES, RESTRICTIONS_TYPE, SOLUTION_GETTERS
+
+    # Convertendo o objetivo para maximização
+    if not IS_MAXIMIZATION:
+        IS_MAXIMIZATION = True
+        OBJ_COEFFICIENTS = OBJ_COEFFICIENTS * -1
+    
+    # Adicionando variáveis de folga
+    added_count = 0
+    for i in range(RESTRICTIONS_COUNT):
+        if RESTRICTIONS_TYPE[i] == TypesOfRestrictions.LessThanOrEqual:
+            new_column = np.zeros(RESTRICTIONS_COUNT)
+            new_column[i] = 1
+
+            MATRIX = np.insert(MATRIX, -1, new_column, axis=1)
+            VAR_TYPES.append(TypesOfVariables.GreaterThanOrEqualToZero)
+            added_count += 1
+        elif RESTRICTIONS_TYPE[i] == TypesOfRestrictions.GreaterThanOrEqual:
+            new_column = np.zeros(RESTRICTIONS_COUNT)
+            new_column[i] = -1
+
+            MATRIX = np.insert(MATRIX, -1, new_column, axis=1)
+            VAR_TYPES.append(TypesOfVariables.GreaterThanOrEqualToZero)
+            added_count += 1
+
+    VAR_COUNT += added_count
+    OBJ_COEFFICIENTS = np.append(OBJ_COEFFICIENTS, [0] * added_count)
+
+    # Garantindo que todas as variáveis sejam não-negativas
+    SOLUTION_GETTERS = []
+    added_count = 0
+    lastAddedIndex = VAR_COUNT - 1
+    for i in range(VAR_COUNT):
+        var_type = VAR_TYPES[i]
+        if var_type == TypesOfVariables.Free:
+            # Variáveis livres: x = x' - x''
+            
+            reference_column = MATRIX[:, i]
+            new_column = reference_column * -1
+
+            MATRIX = np.insert(MATRIX, -1, new_column, axis=1)
+            VAR_TYPES.append(TypesOfVariables.GreaterThanOrEqualToZero)
+
+            lastAddedIndex += 1
+            added_count += 1
+            getter = lambda solutions_list: (solutions_list[i]) - (solutions_list[lastAddedIndex])
+            SOLUTION_GETTERS.append(getter)
+            VAR_TYPES[i] = TypesOfVariables.GreaterThanOrEqualToZero
+        elif var_type == TypesOfVariables.LessThanOrEqualToZero:
+            # Variáveis <= 0: x = -x'
+
+            reference_column = MATRIX[:, i]
+            new_column = reference_column * -1
+            MATRIX[:, i] = new_column
+
+            getter = lambda solutions_list: (solutions_list[i]) * -1
+            SOLUTION_GETTERS.append(getter)
+            VAR_TYPES[i] = TypesOfVariables.GreaterThanOrEqualToZero
+        else:
+            getter = lambda solutions_list: solutions_list[i]
+            SOLUTION_GETTERS.append(getter)
+
+    OBJ_COEFFICIENTS = np.append(OBJ_COEFFICIENTS, [0] * added_count)
+            
 def main():
     # Leitura dos parâmetros
     args = parseArgs()
 
-    # Carregandos os dados da PL nas variáveis globais
+    # Carregandos os dados da PL e colocando em FPI
     LoadPL(args.input)
+    ConvertToFPI()
     
     # Removendo restrições com dependências linear
     #MakeMatrixFullRank()
