@@ -238,11 +238,13 @@ def AuxiliarPL(tableau):
     left_to_override = np.vstack((np.zeros(RESTRICTIONS_COUNT), identity_matrix))
     rows, cols = left_to_override.shape
     tableau[:rows, :cols] = left_to_override
-
-    for i in range (0, RESTRICTIONS_COUNT):
-        tableau = np.delete(tableau, -1, axis=1)
     
-    tableau[0, :] = original_objective_row
+    objective_row = np.concatenate((
+            original_objective_row,
+            np.zeros(RESTRICTIONS_COUNT)
+        ))
+
+    tableau[0, :] = objective_row
 
     return tableau, base
 
@@ -310,11 +312,15 @@ def ExtractPrimalSolution(tableau, base):
     primal = []
     b = tableau[1:, -1]
 
-    for i in base:
-        column = tableau[1:, i]
-        for j in range(0, RESTRICTIONS_COUNT):
-            if column[j] == 1:
-                primal.append(b[j])
+    for i in range(0,ORIGINAL_VAR_COUNT):
+        fixed_column = i + RESTRICTIONS_COUNT
+        if fixed_column in base:
+            column = tableau[1:, fixed_column]
+            for j in range(0, RESTRICTIONS_COUNT):
+                if column[j] == 1:
+                    primal.append(b[j])
+        else:
+            primal.append(0)
 
     return primal
 
@@ -399,13 +405,14 @@ def main():
 
         # Busca uma base viável para o problema e avalia quando a viabilidade
         tableau, base = AuxiliarPL(tableau) 
-
+        
         # Executa o Simplex para a base encontrada
         tableau, base = Simplex(tableau, base)
 
         # Extraí as soluções do tableau final
         value, primal_solutions, dual_solution = ExtractSolutions(tableau, base)
 
+        # Imprimindo os resultados
         PrintSolutions(primal_solutions, dual_solution, value, args.decimals, args.digits)
         if args.show_tableau:
             PrintTableau(tableau, args.decimals, args.digits)
