@@ -54,6 +54,7 @@ def parseArgs():
     parser.add_argument("--input", type=str, required=True, help="Arquivo de entrada com os dados do problema.")
     parser.add_argument("--decimals", type=int, required=False, default=3, help="Número de casas decimais para imprimir valores numéricos.")
     parser.add_argument("--digits", type=int, required=False, default=7, help="Número total de dígitos para imprimir valores numéricos.")
+    parser.add_argument("--show-tableau", type=bool, required=False, default=False, help="Exibe o tableau final.")
 
     return parser.parse_args()
 
@@ -202,55 +203,82 @@ def GetViableBasis(tableau):
 
     return base[0:RESTRICTIONS_COUNT]
 
+def AuxiliarPL(tableau):
+    viable_basis = GetViableBasis(tableau)
+    if len(viable_basis) >= RESTRICTIONS_COUNT:
+        return tableau, viable_basis
+
+    base = [i for i in range(tableau.shape[1] - 1, tableau.shape[1] - 1 + RESTRICTIONS_COUNT)] 
+
+    ones = np.array([1] * RESTRICTIONS_COUNT)
+    identity_matrix = np.eye(RESTRICTIONS_COUNT, dtype=int)
+    new = np.vstack((ones, identity_matrix))
+    print(new)
+    PrintTableau(tableau, 7, 3)
+    tableau = np.insert(tableau, -1, new, axis=1)
+    PrintTableau(tableau, 7, 3)
+
+
+    left_to_override = np.vstack((np.zeros(RESTRICTIONS_COUNT), identity_matrix))
+    rows, cols = left_to_override.shape
+    tableau[:rows, :cols] = left_to_override
+
+    return tableau, base
+
+def SimplexIteration(tableau, base, selected_column):
+    selected_row_index = None
+    min_ratio = np.inf
+    removed_from_base = None
+
+    # Encontrar a linha pivô
+    for i in range(1, RESTRICTIONS_COUNT + 1):
+        coef = tableau[i, selected_column]
+        b = tableau[i, -1]
+        if coef <= 0:
+            continue
+        ratio = b / coef
+        if ratio < min_ratio:
+            min_ratio = ratio
+            selected_row_index = i
+
+    if selected_row_index is None:
+        raise UnboundedLPException()
+
+    # Atualiza a base
+    for j, base_col in enumerate(base):
+        if tableau[selected_row_index, base_col] == 1:
+            removed_from_base = base_col
+            break
+
+    base.remove(removed_from_base)
+    base.append(selected_column)
+
+    # Normaliza a linha pivô
+    pivot_row = tableau[selected_row_index, :]
+    pivot_element = pivot_row[selected_column]
+    tableau[selected_row_index, :] = pivot_row / pivot_element
+
+    # Elimina os valores na coluna pivô das outras linhas
+    for i in range(RESTRICTIONS_COUNT + 1):
+        if i == selected_row_index:
+            continue
+        coef = tableau[i, selected_column]
+        tableau[i, :] -= coef * tableau[selected_row_index, :]
+
+    # Checa se existe colunas compostas só por valores <= 0
+    for i in range(RESTRICTIONS_COUNT, RESTRICTIONS_COUNT*2):
+        if np.all(tableau[1:, i] < 0):
+            raise UnboundedLPException()
+            
+    return tableau, base
+
 def Simplex(tableau, base):
     while np.any(tableau[0, RESTRICTIONS_COUNT:-1] < 0):
         selected_column = np.argmin(tableau[0, RESTRICTIONS_COUNT:-1]) + RESTRICTIONS_COUNT
         if selected_column in base:
             break 
 
-        selected_row_index = None
-        min_ratio = np.inf
-        removed_from_base = None
-
-        # Encontrar a linha pivô
-        for i in range(1, RESTRICTIONS_COUNT + 1):
-            coef = tableau[i, selected_column]
-            b = tableau[i, -1]
-            if coef <= 0:
-                continue
-            ratio = b / coef
-            if ratio < min_ratio:
-                min_ratio = ratio
-                selected_row_index = i
-
-        if selected_row_index is None:
-            raise UnboundedLPException()
-
-        # Atualiza a base
-        for j, base_col in enumerate(base):
-            if tableau[selected_row_index, base_col] == 1:
-                removed_from_base = base_col
-                break
-
-        base.remove(removed_from_base)
-        base.append(selected_column)
-
-        # Normaliza a linha pivô
-        pivot_row = tableau[selected_row_index, :]
-        pivot_element = pivot_row[selected_column]
-        tableau[selected_row_index, :] = pivot_row / pivot_element
-
-        # Elimina os valores na coluna pivô das outras linhas
-        for i in range(RESTRICTIONS_COUNT + 1):
-            if i == selected_row_index:
-                continue
-            coef = tableau[i, selected_column]
-            tableau[i, :] -= coef * tableau[selected_row_index, :]
-
-        # Checa se existe colunas compostas só por valores <= 0
-        for i in range(RESTRICTIONS_COUNT, RESTRICTIONS_COUNT*2):
-            if np.all(tableau[1:, i] < 0):
-                raise UnboundedLPException()
+        tableau, base = SimplexIteration(tableau, base, selected_column)
 
     return tableau, base
 
@@ -281,16 +309,27 @@ def ExtractSolutions(tableau, base):
     primal = ExtractPrimalSolution(tableau, base)
     solutions = [primal]
 
-    multipleSolutions, columnToJoin = HasMultipleSolutions(tableau, base)
+    multipleSolutions, selected_column = HasMultipleSolutions(tableau, base)
     if multipleSolutions:
-        print ("Tem multiplas soluções!")
-        #solutions.append()
+        tableau, base = SimplexIteration(tableau, base, selected_column)
+        other_solution = ExtractPrimalSolution(tableau, base)
+        solutions.append(other_solution)
 
     return value, solutions, dual
 
-def FormatNumber(number, decimals, digits):
-    format_string = f"{{:>{digits}.{decimals}f}}"
-    return format_string.format(number)
+def FormatNumber(number, decimals, digits, simple=False):
+    positive_format_string = f" {{:>{digits}.{decimals}f}}"
+    negative_format_string = f"{{:>{digits}.{decimals}f}}"
+
+    if simple:
+        return negative_format_string.format(number)
+
+    if number == 0:
+        return positive_format_string.format(0)
+    elif number < 0:
+        return negative_format_string.format(number)
+    else:
+        return positive_format_string.format(number)
 
 def PrintTableau(tableau, decimals, digits):
     rows, cols = tableau.shape
@@ -312,12 +351,12 @@ def PrintTableau(tableau, decimals, digits):
 
 def PrintSolutions(primal_solutions, dual_solution, value, decimals, digits):
     print("otima")
-    print(FormatNumber(value, decimals, digits))
+    print(FormatNumber(value, decimals, digits, simple=True))
 
     for solution in primal_solutions:
-        print(" ".join(FormatNumber(j, decimals, digits) for j in solution))
+        print(" ".join(FormatNumber(j, decimals, digits, simple=True) for j in solution))
 
-    print(" ".join(FormatNumber(j, decimals, digits) for j in dual_solution))
+    print(" ".join(FormatNumber(j, decimals, digits, simple=True) for j in dual_solution))
 
 def main():
     # Leitura dos parâmetros
@@ -334,13 +373,18 @@ def main():
         # Criando o tableau estendido
         tableau = ExtendTableau()
 
-        # Busca uma base viável para o problema
-        base = GetViableBasis(tableau)        
+        # Busca uma base viável para o problema e avalia quando a viabilidade
+        tableau, base = AuxiliarPL(tableau) 
+
+        # Executa o Simplex para a base encontrada
         tableau, base = Simplex(tableau, base)
+
+        # Extraí as soluções do tableau final
         value, primal_solutions, dual_solution = ExtractSolutions(tableau, base)
 
         PrintSolutions(primal_solutions, dual_solution, value, args.decimals, args.digits)
-        #PrintTableau(tableau, args.decimals, args.digits)
+        if args.show_tableau:
+            PrintTableau(tableau, args.decimals, args.digits)
     except InviableLPException:
         print ("inviavel")
     except UnboundedLPException:
