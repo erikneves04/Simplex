@@ -31,6 +31,24 @@ MATRIX = None # inclui o vetor b a direita
 IS_MAXIMIZATION = False
 SOLUTION_GETTERS = None
 
+class InviableLPException(Exception):
+    """
+    Exceção personalizada para indicar que o problema de Programação Linear (LP)
+    não possui solução viável.
+    """
+    def __init__(self, message="O problema de Programação Linear não possui solução viável."):
+        self.message = message
+        super().__init__(self.message)
+
+class UnboundedLPException(Exception):
+    """
+    Exceção personalizada para indicar que o problema de Programação Linear (LP)
+    é ilimitado (unbounded).
+    """
+    def __init__(self, message="O problema de Programação Linear é ilimitado."):
+        self.message = message
+        super().__init__(self.message)
+
 def parseArgs():
     parser = argparse.ArgumentParser(description="Aplicação solução de problemas de programação linear usando o simplex")
     parser.add_argument("--input", type=str, required=True, help="Arquivo de entrada com os dados do problema.")
@@ -146,6 +164,14 @@ def ConvertToFPI():
     VAR_COUNT += added_count
     OBJ_COEFFICIENTS = np.append(OBJ_COEFFICIENTS, [0] * added_count)
 
+    # Garantindo que o B seja positivo
+    for i in range(0, RESTRICTIONS_COUNT):
+        row = MATRIX[i, :]
+        b = row[-1]
+
+        if b < 0:
+            MATRIX[i, :] = row * -1
+
     # Garantindo que todas as variáveis sejam não-negativas
     SOLUTION_GETTERS = []
     added_count = 0
@@ -179,24 +205,98 @@ def ConvertToFPI():
         else:
             getter = lambda solutions_list: solutions_list[i]
             SOLUTION_GETTERS.append(getter)
-
+    
     OBJ_COEFFICIENTS = np.append(OBJ_COEFFICIENTS, [0] * added_count)
-            
+
+def GetViableBasis(tableau):
+    base = []
+    for i in range(RESTRICTIONS_COUNT, tableau.shape[1] -1):
+        for j in range (1, RESTRICTIONS_COUNT + 1):
+            expected_colum = np.zeros(RESTRICTIONS_COUNT + 1)
+            expected_colum[j] = 1
+            column = tableau[:,i]
+
+            if np.array_equal(expected_colum, column):
+                base.append(i)
+
+    return base[0:RESTRICTIONS_COUNT]
+
+def Simplex(tableau, base):
+    while np.any(tableau[0, RESTRICTIONS_COUNT:-1] < 0):
+        selected_column = np.argmin(tableau[0, RESTRICTIONS_COUNT:-1]) + RESTRICTIONS_COUNT
+        if selected_column in base:
+            break 
+
+        selected_row_index = None
+        min_ratio = np.inf
+        removed_from_base = None
+
+        # Encontrar a linha pivô
+        for i in range(1, RESTRICTIONS_COUNT + 1):
+            coef = tableau[i, selected_column]
+            b = tableau[i, -1]
+            if coef <= 0:
+                continue
+            ratio = b / coef
+            if ratio < min_ratio:
+                min_ratio = ratio
+                selected_row_index = i
+
+        if selected_row_index is None:
+            raise UnboundedLPException()
+
+        # Atualiza a base
+        for j, base_col in enumerate(base):
+            if tableau[selected_row_index, base_col] == 1:
+                removed_from_base = base_col
+                break
+
+        base.remove(removed_from_base)
+        base.append(selected_column)
+
+        # Normaliza a linha pivô
+        pivot_row = tableau[selected_row_index, :]
+        pivot_element = pivot_row[selected_column]
+        tableau[selected_row_index, :] = pivot_row / pivot_element
+
+        # Elimina os valores na coluna pivô das outras linhas
+        for i in range(RESTRICTIONS_COUNT + 1):
+            if i == selected_row_index:
+                continue
+            coef = tableau[i, selected_column]
+            tableau[i, :] -= coef * tableau[selected_row_index, :]
+
+        # Checa se existe colunas compostas só por valores <= 0
+        for i in range(RESTRICTIONS_COUNT, RESTRICTIONS_COUNT*2):
+            if np.all(tableau[1:, i] < 0):
+                raise UnboundedLPException()
+
+    return tableau, base
+
 def main():
     # Leitura dos parâmetros
     args = parseArgs()
 
-    # Carregandos os dados da PL e colocando em FPI
-    LoadPL(args.input)
-    ConvertToFPI()
-    
-    # Removendo restrições com dependências linear
-    #MakeMatrixFullRank()
+    try:
+        # Carregandos os dados da PL e colocando em FPI
+        LoadPL(args.input)
+        ConvertToFPI()
+        
+        # Removendo restrições com dependências linear
+        #MakeMatrixFullRank()
 
-    # Criando o tableau estendido
-    tableau = ExtendTableau()
+        # Criando o tableau estendido
+        tableau = ExtendTableau()
 
-    PrintTableau(tableau, args.decimals, args.digits)
+        # Busca uma base viável para o problema
+        base = GetViableBasis(tableau)        
+        tableau, base = Simplex(tableau, base)
+
+        PrintTableau(tableau, args.decimals, args.digits)
+    except InviableLPException:
+        print ("Status: inviavel")
+    except UnboundedLPException:
+        print ("Status: ilimitada")
 
 if __name__ == "__main__":
     main() 
