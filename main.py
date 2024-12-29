@@ -208,16 +208,28 @@ def AuxiliarPL(tableau):
     if len(viable_basis) >= RESTRICTIONS_COUNT:
         return tableau, viable_basis
 
+    tableau[0, :] = np.zeros(tableau.shape[1])
+
     base = [i for i in range(tableau.shape[1] - 1, tableau.shape[1] - 1 + RESTRICTIONS_COUNT)] 
 
     ones = np.array([1] * RESTRICTIONS_COUNT)
     identity_matrix = np.eye(RESTRICTIONS_COUNT, dtype=int)
     new = np.vstack((ones, identity_matrix))
-    print(new)
-    PrintTableau(tableau, 7, 3)
-    tableau = np.insert(tableau, -1, new, axis=1)
-    PrintTableau(tableau, 7, 3)
 
+    for i in range(0,new.shape[1]):
+        tableau = np.insert(tableau, -1, new[:, i], axis=1)
+
+    for i in range(1, RESTRICTIONS_COUNT + 1):
+        tableau[0, :] -= tableau[i, :]
+
+    tableau, base = Simplex(tableau, base)
+
+    objective_value = tableau[0, -1]
+
+    if objective_value > 0:
+        raise UnboundedLPException()
+    elif objective_value < 0:
+        raise InviableLPException()
 
     left_to_override = np.vstack((np.zeros(RESTRICTIONS_COUNT), identity_matrix))
     rows, cols = left_to_override.shape
