@@ -116,25 +116,6 @@ def ExtendTableau():
 
     return extended_matrix
 
-def PrintTableau(tableau, decimals, digits):
-    rows, cols = tableau.shape
-    left_cols = rows - 1
-    main_cols = cols - left_cols - 1
-
-    format_string = f"{{:>{digits}.{decimals}f}}"
-    def format_row(row):
-        left_part = " | ".join(format_string.format(row[j]) for j in range(left_cols))
-        main_part = " | ".join(format_string.format(row[j + left_cols]) for j in range(main_cols))
-        rhs_part = format_string.format(row[-1]) 
-        return f"{left_part} || {main_part} || {rhs_part}"
-
-    formatted_rows = [format_row(tableau[i, :]) for i in range(rows)]
-    line_separator = "=" * len(formatted_rows[0])
-
-    table = [line_separator] + [formatted_rows[0]] + [line_separator] + formatted_rows[1:] + [line_separator]
-    
-    print("\n".join(table))
-
 def ConvertToFPI():
     global MATRIX, OBJ_COEFFICIENTS, IS_MAXIMIZATION, VAR_COUNT, VAR_TYPES, RESTRICTIONS_TYPE, SOLUTION_GETTERS
 
@@ -273,6 +254,71 @@ def Simplex(tableau, base):
 
     return tableau, base
 
+def ExtractPrimalSolution(tableau, base):
+    primal = []
+    b = tableau[1:, -1]
+
+    for i in base:
+        column = tableau[1:, i]
+        for j in range(0, RESTRICTIONS_COUNT):
+            if column[j] == 1:
+                primal.append(b[j])
+
+    return primal
+
+def HasMultipleSolutions(tableau, base):
+    objective = tableau[0, :]
+    for i in range(RESTRICTIONS_COUNT, RESTRICTIONS_COUNT + ORIGINAL_VAR_COUNT):
+        if i in base or objective[i] != 0: 
+            continue
+
+        return True, i
+    return False, None
+
+def ExtractSolutions(tableau, base):
+    value = tableau[0, -1]
+    dual = tableau[0, 0:RESTRICTIONS_COUNT]
+    primal = ExtractPrimalSolution(tableau, base)
+    solutions = [primal]
+
+    multipleSolutions, columnToJoin = HasMultipleSolutions(tableau, base)
+    if multipleSolutions:
+        print ("Tem multiplas soluções!")
+        #solutions.append()
+
+    return value, solutions, dual
+
+def FormatNumber(number, decimals, digits):
+    format_string = f"{{:>{digits}.{decimals}f}}"
+    return format_string.format(number)
+
+def PrintTableau(tableau, decimals, digits):
+    rows, cols = tableau.shape
+    left_cols = rows - 1
+    main_cols = cols - left_cols - 1
+
+    def format_row(row):
+        left_part = " | ".join(FormatNumber(row[j], decimals, digits) for j in range(left_cols))
+        main_part = " | ".join(FormatNumber(row[j + left_cols], decimals, digits) for j in range(main_cols))
+        rhs_part = FormatNumber(row[-1], decimals, digits)
+        return f"{left_part} || {main_part} || {rhs_part}"
+
+    formatted_rows = [format_row(tableau[i, :]) for i in range(rows)]
+    line_separator = "=" * len(formatted_rows[0])
+
+    table = [line_separator] + [formatted_rows[0]] + [line_separator] + formatted_rows[1:] + [line_separator]
+    
+    print("\n".join(table))
+
+def PrintSolutions(primal_solutions, dual_solution, value, decimals, digits):
+    print("otima")
+    print(FormatNumber(value, decimals, digits))
+
+    for solution in primal_solutions:
+        print(" ".join(FormatNumber(j, decimals, digits) for j in solution))
+
+    print(" ".join(FormatNumber(j, decimals, digits) for j in dual_solution))
+
 def main():
     # Leitura dos parâmetros
     args = parseArgs()
@@ -291,12 +337,14 @@ def main():
         # Busca uma base viável para o problema
         base = GetViableBasis(tableau)        
         tableau, base = Simplex(tableau, base)
+        value, primal_solutions, dual_solution = ExtractSolutions(tableau, base)
 
-        PrintTableau(tableau, args.decimals, args.digits)
+        PrintSolutions(primal_solutions, dual_solution, value, args.decimals, args.digits)
+        #PrintTableau(tableau, args.decimals, args.digits)
     except InviableLPException:
-        print ("Status: inviavel")
+        print ("inviavel")
     except UnboundedLPException:
-        print ("Status: ilimitada")
+        print ("ilimitada")
 
 if __name__ == "__main__":
     main() 
