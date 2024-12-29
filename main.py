@@ -61,6 +61,15 @@ def parseArgs():
 def IsNearZero(number, epsilon=1e-10):
     return abs(number) < epsilon
 
+def ReplaceNearZero(matrix):
+    rows, cols = matrix.shape
+    for i in range(rows):
+        for j in range(cols):
+            if IsNearZero(matrix[i, j]):
+                matrix[i, j] = 0
+
+    return matrix
+
 def LoadPL(filename):
     global VAR_COUNT, ORIGINAL_VAR_COUNT, RESTRICTIONS_COUNT, VAR_TYPES, OBJ_COEFFICIENTS, RESTRICTIONS_TYPE, MATRIX, IS_MAXIMIZATION
 
@@ -292,8 +301,16 @@ def SimplexIteration(tableau, base, selected_column):
         tableau[i, :] -= coef * tableau[selected_row_index, :]
 
     # Checa se existe colunas compostas só por valores <= 0
-    for i in range(RESTRICTIONS_COUNT, RESTRICTIONS_COUNT*2):
-        if np.all(tableau[1:, i] < 0):
+    for i in range(RESTRICTIONS_COUNT, tableau.shape[1] - 1):
+        column = tableau[:, i]
+
+        has_bigger_than_zero = False
+        for j in column:
+            if j > 0 and not IsNearZero(j):
+                has_bigger_than_zero = True
+                break
+            
+        if not has_bigger_than_zero:
             raise UnboundedLPException()
             
     return tableau, base
@@ -305,6 +322,7 @@ def Simplex(tableau, base):
             break 
 
         tableau, base = SimplexIteration(tableau, base, selected_column)
+        tableau = ReplaceNearZero(tableau)
 
     return tableau, base
 
