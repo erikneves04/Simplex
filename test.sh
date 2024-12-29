@@ -51,8 +51,12 @@ for input_file in "$input_dir"/*; do
     # Executa o programa com o arquivo de entrada e redireciona a saída para o arquivo de saída (supressão de erros)
     python3 main.py --input "$input_file" --decimals 7 > "$output_file" 2>/dev/null
 
-    # Compara a saída gerada com a saída esperada (supressão de erros)
-    if diff -q "$output_file" "$expected_output_file" > /dev/null 2>/dev/null; then
+     # Remove CRLF e espaços ao final das linhas em ambos os arquivos
+    sed -i 's/\r$//' "$output_file" "$expected_output_file" 2>/dev/null
+    sed -i 's/[[:space:]]*$//' "$output_file" "$expected_output_file" 2>/dev/null
+
+    # Compara os arquivos ignorando diferenças insignificantes
+    if diff -q -b -B "$output_file" "$expected_output_file" > /dev/null 2>/dev/null; then
         status="PASSED"
         passed_tests=$((passed_tests + 1))
         rm -f "$output_file"
