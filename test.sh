@@ -77,6 +77,7 @@ if [[ $total_tests -eq $passed_tests ]]; then
     rm -rf "$output_dir"
     echo -e "Todos os testes ${GREEN}passaram${NC}."
 else
+    echo "$passed_tests passaram."
     echo "Consulte as saídas com problemas em '$output_dir'."
 fi
 
