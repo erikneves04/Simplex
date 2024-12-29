@@ -265,11 +265,9 @@ def SimplexIteration(tableau, base, selected_column):
     # Encontrar a linha pivô
     for i in range(1, RESTRICTIONS_COUNT + 1):
         coef = tableau[i, selected_column]
-        if IsNearZero(coef):
-            coef = 0
 
         b = tableau[i, -1]
-        if coef <= 0:
+        if coef <= 0 or IsNearZero(coef):
             continue
         ratio = b / coef
         if ratio < min_ratio:
@@ -309,7 +307,7 @@ def SimplexIteration(tableau, base, selected_column):
             if j > 0 and not IsNearZero(j):
                 has_bigger_than_zero = True
                 break
-            
+
         if not has_bigger_than_zero:
             raise UnboundedLPException()
             
