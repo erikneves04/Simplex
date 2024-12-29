@@ -58,6 +58,9 @@ def parseArgs():
 
     return parser.parse_args()
 
+def IsNearZero(number, epsilon=1e-10):
+    return abs(number) < epsilon
+
 def LoadPL(filename):
     global VAR_COUNT, ORIGINAL_VAR_COUNT, RESTRICTIONS_COUNT, VAR_TYPES, OBJ_COEFFICIENTS, RESTRICTIONS_TYPE, MATRIX, IS_MAXIMIZATION
 
@@ -208,6 +211,7 @@ def AuxiliarPL(tableau):
     if len(viable_basis) >= RESTRICTIONS_COUNT:
         return tableau, viable_basis
 
+    original_objective_row = tableau[0, :].copy()
     tableau[0, :] = np.zeros(tableau.shape[1])
 
     base = [i for i in range(tableau.shape[1] - 1, tableau.shape[1] - 1 + RESTRICTIONS_COUNT)] 
@@ -223,17 +227,22 @@ def AuxiliarPL(tableau):
         tableau[0, :] -= tableau[i, :]
 
     tableau, base = Simplex(tableau, base)
-
     objective_value = tableau[0, -1]
 
-    if objective_value > 0:
-        raise UnboundedLPException()
-    elif objective_value < 0:
-        raise InviableLPException()
+    if not IsNearZero(objective_value):
+        if objective_value > 0:
+            raise UnboundedLPException()
+        elif objective_value < 0:
+            raise InviableLPException()
 
     left_to_override = np.vstack((np.zeros(RESTRICTIONS_COUNT), identity_matrix))
     rows, cols = left_to_override.shape
     tableau[:rows, :cols] = left_to_override
+
+    for i in range (0, RESTRICTIONS_COUNT):
+        tableau = np.delete(tableau, -1, axis=1)
+    
+    tableau[0, :] = original_objective_row
 
     return tableau, base
 
@@ -245,6 +254,9 @@ def SimplexIteration(tableau, base, selected_column):
     # Encontrar a linha pivô
     for i in range(1, RESTRICTIONS_COUNT + 1):
         coef = tableau[i, selected_column]
+        if IsNearZero(coef):
+            coef = 0
+
         b = tableau[i, -1]
         if coef <= 0:
             continue
@@ -336,7 +348,7 @@ def FormatNumber(number, decimals, digits, simple=False):
     if simple:
         return negative_format_string.format(number)
 
-    if number == 0:
+    if IsNearZero(number):
         return positive_format_string.format(0)
     elif number < 0:
         return negative_format_string.format(number)
