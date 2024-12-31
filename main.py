@@ -326,13 +326,16 @@ def SelectColumn(tableau, base, policy):
     if eligible.size == 0:
         return None
     
-    Policy.LARGEST
     if policy == Policy.LARGEST:
-        target_idx = eligible[np.argmin(obj_coeffs[eligible])]
+        min_val = obj_coeffs[eligible].min()
+        candidates = eligible[obj_coeffs[eligible] == min_val]
     elif policy == Policy.SMALLEST:
-        target_idx = eligible[np.argmax(obj_coeffs[eligible])]
+        max_val = obj_coeffs[eligible].max()
+        candidates = eligible[obj_coeffs[eligible] == max_val]
     elif policy == Policy.BLAND:
-        target_idx = eligible[0]
+        candidates = eligible
+
+    target_idx = candidates.min()
     
     return target_idx + len(base)
 
