@@ -390,8 +390,8 @@ def ExtractSolutions(tableau, base):
     return value, solutions, dual
 
 def FormatNumber(number, decimals, digits, simple=False):
-    positive_format_string = f" {{:>{digits}.{decimals}f}}"
-    negative_format_string = f"{{:>{digits}.{decimals}f}}"
+    negative_format_string = f"%*.*f" % (digits, decimals, number)
+    positive_format_string = ' ' + negative_format_string
 
     if simple:
         return negative_format_string.format(number)
