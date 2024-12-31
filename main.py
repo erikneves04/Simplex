@@ -305,12 +305,15 @@ def SimplexIteration(tableau, base, selected_column):
         tableau[i, :] -= coef * tableau[selected_row_index, :]
 
     # Checa se existe colunas compostas só por valores <= 0
-    for i in range(RESTRICTIONS_COUNT, tableau.shape[1] - 1):
-        column = tableau[:, i]
+    for i in base:
+        column = tableau[1:, i]
 
         has_bigger_than_zero = False
-        for j in column:
-            if j > 0 and not IsNearZero(j):
+        for index in range (0, RESTRICTIONS_COUNT):
+            element = column[index]
+            fixed_index = index + 1
+
+            if (element > 0 and not IsNearZero(element)) or (tableau[fixed_index, -1] < 0 and element < 0):
                 has_bigger_than_zero = True
                 break
 
@@ -440,7 +443,7 @@ def main():
         ConvertToFPI()
         
         # Removendo restrições com dependências linear
-        #MakeMatrixFullRank()
+        #MakeMatrixFullRank(MATRIX[:,:-1])
 
         # Criando o tableau estendido
         tableau = ExtendTableau()
