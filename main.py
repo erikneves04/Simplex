@@ -263,12 +263,9 @@ def AuxiliarPL(tableau, policy):
 
     return tableau, base
 
-def SimplexIteration(tableau, base, selected_column):
+def SelectRow(tableau, selected_column):
     selected_row_index = None
     min_ratio = np.inf
-    removed_from_base = None
-
-    # Encontrar a linha pivô
     for i in range(1, RESTRICTIONS_COUNT + 1):
         coef = tableau[i, selected_column]
 
@@ -279,9 +276,18 @@ def SimplexIteration(tableau, base, selected_column):
         if ratio < min_ratio:
             min_ratio = ratio
             selected_row_index = i
-
+    
     if selected_row_index is None:
         raise UnboundedLPException()
+    
+    return selected_row_index
+
+def SimplexIteration(tableau, base, selected_column):
+    selected_row_index = None
+    removed_from_base = None
+
+    # Encontrar a linha pivô
+    selected_row_index = SelectRow(tableau, selected_column)
 
     # Atualiza a base
     for j, base_col in enumerate(base):
