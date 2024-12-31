@@ -19,6 +19,15 @@ class TypesOfRestrictions(Enum):
 
     def __str__(self):
         return self.value
+    
+# Política de seleção de colunas
+class Policy(Enum):
+    LARGEST = "largest"
+    BLAND = "bland"
+    SMALLEST = "smallest"
+
+    def __str__(self):
+        return self.value
 
 # Variáveis de controle
 ORIGINAL_VAR_COUNT = 0
@@ -30,6 +39,7 @@ RESTRICTIONS_TYPE = []
 MATRIX = None # inclui o vetor b a direita
 IS_MAXIMIZATION = False
 SOLUTION_GETTERS = None
+POLICY = None
 
 class InviableLPException(Exception):
     """
@@ -54,6 +64,7 @@ def parseArgs():
     parser.add_argument("--input", type=str, required=True, help="Arquivo de entrada com os dados do problema.")
     parser.add_argument("--decimals", type=int, required=False, default=3, help="Número de casas decimais para imprimir valores numéricos.")
     parser.add_argument("--digits", type=int, required=False, default=7, help="Número total de dígitos para imprimir valores numéricos.")
+    parser.add_argument('--policy', type=Policy, choices=list(Policy), required=False, default= Policy.LARGEST, help='Política adotada para seleção de colunas durante a execução do simplex.')
     parser.add_argument("--show-tableau", type=bool, required=False, default=False, help="Exibe o tableau final.")
 
     return parser.parse_args()
@@ -62,12 +73,7 @@ def IsNearZero(number, epsilon=1e-10):
     return abs(number) < epsilon
 
 def ReplaceNearZero(matrix):
-    rows, cols = matrix.shape
-    for i in range(rows):
-        for j in range(cols):
-            if IsNearZero(matrix[i, j]):
-                matrix[i, j] = 0
-
+    matrix[np.isclose(matrix, 0, atol=1e-10)] = 0
     return matrix
 
 def LoadPL(filename):
@@ -215,7 +221,7 @@ def GetViableBasis(tableau):
 
     return base[0:RESTRICTIONS_COUNT]
 
-def AuxiliarPL(tableau):
+def AuxiliarPL(tableau, policy):
     viable_basis = GetViableBasis(tableau)
     if len(viable_basis) >= RESTRICTIONS_COUNT:
         return tableau, viable_basis
@@ -235,7 +241,7 @@ def AuxiliarPL(tableau):
     for i in range(1, RESTRICTIONS_COUNT + 1):
         tableau[0, :] -= tableau[i, :]
 
-    tableau, base = Simplex(tableau, base)
+    tableau, base = Simplex(tableau, base, policy)
     objective_value = tableau[0, -1]
 
     if not IsNearZero(objective_value):
@@ -313,11 +319,28 @@ def SimplexIteration(tableau, base, selected_column):
             
     return tableau, base
 
-def Simplex(tableau, base):
+def SelectColumn(tableau, base, policy):
+    obj_coeffs = tableau[0, len(base):-1]  
+    eligible = np.where(obj_coeffs < 0)[0]
+    
+    if eligible.size == 0:
+        return None
+    
+    Policy.LARGEST
+    if policy == Policy.LARGEST:
+        target_idx = eligible[np.argmin(obj_coeffs[eligible])]
+    elif policy == Policy.SMALLEST:
+        target_idx = eligible[np.argmax(obj_coeffs[eligible])]
+    elif policy == Policy.BLAND:
+        target_idx = eligible[0]
+    
+    return target_idx + len(base)
+
+def Simplex(tableau, base, policy):
     while np.any(tableau[0, RESTRICTIONS_COUNT:-1] < 0):
-        selected_column = np.argmin(tableau[0, RESTRICTIONS_COUNT:-1]) + RESTRICTIONS_COUNT
-        if selected_column in base:
-            break 
+        selected_column = SelectColumn(tableau, base, policy)
+        if selected_column == None:
+            break
 
         tableau, base = SimplexIteration(tableau, base, selected_column)
         tableau = ReplaceNearZero(tableau)
@@ -420,10 +443,10 @@ def main():
         tableau = ExtendTableau()
 
         # Busca uma base viável para o problema e avalia quando a viabilidade
-        tableau, base = AuxiliarPL(tableau) 
+        tableau, base = AuxiliarPL(tableau, args.policy) 
         
         # Executa o Simplex para a base encontrada
-        tableau, base = Simplex(tableau, base)
+        tableau, base = Simplex(tableau, base, args.policy)
 
         # Extraí as soluções do tableau final
         value, primal_solutions, dual_solution = ExtractSolutions(tableau, base)
@@ -432,6 +455,7 @@ def main():
         PrintSolutions(primal_solutions, dual_solution, value, args.decimals, args.digits)
         if args.show_tableau:
             PrintTableau(tableau, args.decimals, args.digits)
+
     except InviableLPException:
         print ("inviavel")
     except UnboundedLPException:
