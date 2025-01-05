@@ -278,8 +278,12 @@ def SelectRow(tableau, selected_column):
             selected_row_index = i
     
     if selected_row_index is None:
-        raise UnboundedLPException()
-    
+        tableau = ReplaceNearZero(tableau)
+        if np.any(tableau[0, RESTRICTIONS_COUNT:-1] < 0):
+            raise UnboundedLPException()
+
+        return None
+
     return selected_row_index
 
 def SimplexIteration(tableau, base, selected_column):
@@ -288,6 +292,8 @@ def SimplexIteration(tableau, base, selected_column):
 
     # Encontrar a linha pivô
     selected_row_index = SelectRow(tableau, selected_column)
+    if selected_row_index == None:
+        return tableau, base
 
     # Atualiza a base
     for j, base_col in enumerate(base):
@@ -431,12 +437,23 @@ def PrintTableau(tableau, decimals, digits):
     print("\n".join(table))
 
 def PrintSolutions(primal_solutions, dual_solution, value, decimals, digits):
-    print("otima")
-    print(FormatNumber(value, decimals, digits, simple=True))
+
+    if len(primal_solutions) > 1:
+        print("Status: otima (multiplos)")
+    else:
+        print("Status: otima")
+
+    print(f'Objetivo: {FormatNumber(value, decimals, digits, simple=True)}')
+
+    if len(primal_solutions) > 1:
+        print("Solucoes:")
+    else:
+        print("Solucao:")
 
     for solution in primal_solutions:
         print(" ".join(FormatNumber(j, decimals, digits, simple=True) for j in solution))
 
+    print("Dual:")
     print(" ".join(FormatNumber(j, decimals, digits, simple=True) for j in dual_solution))
 
 def main():
@@ -454,6 +471,8 @@ def main():
         # Criando o tableau estendido
         tableau = ExtendTableau()
 
+        #PrintTableau(tableau, args.decimals, args.digits)
+
         # Busca uma base viável para o problema e avalia quando a viabilidade
         tableau, base = AuxiliarPL(tableau, args.policy) 
         
@@ -469,9 +488,9 @@ def main():
             PrintTableau(tableau, args.decimals, args.digits)
 
     except InviableLPException:
-        print ("inviavel")
+        print ("Status: inviavel")
     except UnboundedLPException:
-        print ("ilimitada")
+        print ("Status: ilimitada")
 
 if __name__ == "__main__":
     main() 
