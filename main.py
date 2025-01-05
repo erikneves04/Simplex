@@ -331,7 +331,7 @@ def SimplexIteration(tableau, base, selected_column):
 
         if not has_bigger_than_zero:
             raise UnboundedLPException()
-            
+    
     return tableau, base
 
 def SelectColumn(tableau, base, policy):
@@ -465,13 +465,8 @@ def main():
         LoadPL(args.input)
         ConvertToFPI()
         
-        # Removendo restrições com dependências linear
-        #MakeMatrixFullRank(MATRIX[:,:-1])
-
         # Criando o tableau estendido
         tableau = ExtendTableau()
-
-        #PrintTableau(tableau, args.decimals, args.digits)
 
         # Busca uma base viável para o problema e avalia quando a viabilidade
         tableau, base = AuxiliarPL(tableau, args.policy) 
