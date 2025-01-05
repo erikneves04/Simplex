@@ -247,7 +247,9 @@ def AuxiliarPL(tableau, policy):
     identity_matrix = np.eye(RESTRICTIONS_COUNT, dtype=int)
     new = np.vstack((ones, identity_matrix))
 
+    columns_to_delete = []
     for i in range(0,new.shape[1]):
+        columns_to_delete.append(tableau.shape[1] - 1)
         tableau = np.insert(tableau, -1, new[:, i], axis=1)
 
     for i in range(1, RESTRICTIONS_COUNT + 1):
@@ -265,15 +267,23 @@ def AuxiliarPL(tableau, policy):
     left_to_override = np.vstack((np.zeros(RESTRICTIONS_COUNT), identity_matrix))
     rows, cols = left_to_override.shape
     tableau[:rows, :cols] = left_to_override
-    
+
+    PrintDetailText("############################# PL AUXILIAR FINAL ##############################")
+    PrintDetailTableau(tableau)
+
     objective_row = np.concatenate((
             original_objective_row,
             np.zeros(RESTRICTIONS_COUNT)
         ))
 
     tableau[0, :] = objective_row
+    #rows_to_delete = [] # range(tableau.shape[0] - RESTRICTIONS_COUNT - 1, tableau.shape[0] - 1)
+    #for i in range (0, RESTRICTIONS_COUNT)
+    
+    for i in range(len(columns_to_delete)):
+        tableau = np.delete(tableau, -2, axis=1)
 
-    PrintDetailText("############################# PL AUXILIAR FINAL ##############################")
+    PrintDetailText("############################# AFTER ##############################")
     PrintDetailTableau(tableau)
 
     return tableau, base
