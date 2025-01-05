@@ -439,7 +439,7 @@ def ExtractSolutions(tableau, base):
 
 def FormatNumber(number, simple=False):
     negative_format_string = f"%*.*f" % (DIGITS, DECIMALS, number)
-    positive_format_string = ' ' + negative_format_string
+    positive_format_string = negative_format_string
 
     if simple:
         return negative_format_string.format(number)
@@ -457,16 +457,19 @@ def PrintTableau(tableau):
     main_cols = cols - left_cols - 1
 
     def format_row(row):
-        left_part = " | ".join(FormatNumber(row[j]) for j in range(left_cols))
+        # Format each part of the row with fixed widths
         main_part = " | ".join(FormatNumber(row[j + left_cols]) for j in range(main_cols))
         rhs_part = FormatNumber(row[-1])
-        return f"{left_part} || {main_part} || {rhs_part}"
+        return f"{main_part} || {rhs_part}"
 
+    # Format all rows
     formatted_rows = [format_row(tableau[i, :]) for i in range(rows)]
-    line_separator = "=" * len(formatted_rows[0])
+    line_separator = "=" * len(formatted_rows[0])  # Use the length of a formatted row for alignment
 
+    # Assemble the table with separators
     table = [line_separator] + [formatted_rows[0]] + [line_separator] + formatted_rows[1:] + [line_separator]
     
+    # Print the table
     print("\n".join(table))
 
 def PrintSolutions(primal_solutions, dual_solution, value):
@@ -476,7 +479,7 @@ def PrintSolutions(primal_solutions, dual_solution, value):
     else:
         print("Status: otima")
 
-    print(f'Objetivo: {FormatNumber(value, simple=True)}')
+    print(f'Objetivo: {TrimText(FormatNumber(value, simple=True))}')
 
     if len(primal_solutions) > 1:
         print("Solucoes:")
@@ -484,10 +487,10 @@ def PrintSolutions(primal_solutions, dual_solution, value):
         print("Solucao:")
 
     for solution in primal_solutions:
-        print(" ".join(FormatNumber(j, simple=True) for j in solution))
+        print(TrimText(" ".join(FormatNumber(j, simple=True) for j in solution)))
 
     print("Dual:")
-    print(" ".join(FormatNumber(j, simple=True) for j in dual_solution))
+    print(TrimText(" ".join(FormatNumber(j, simple=True) for j in dual_solution)))
 
 def PrintDetailText(string):
     if DETAIL:
@@ -496,6 +499,9 @@ def PrintDetailText(string):
 def PrintDetailTableau(tableau):
     if DETAIL:
         PrintTableau(tableau)
+
+def TrimText(text):
+    return ' '.join(text.strip().split())
 
 def main():
     global DETAIL, DECIMALS, DIGITS
