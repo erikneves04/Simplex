@@ -457,19 +457,16 @@ def PrintTableau(tableau):
     main_cols = cols - left_cols - 1
 
     def format_row(row):
-        # Format each part of the row with fixed widths
+        left_part = " | ".join(FormatNumber(row[j]) for j in range(left_cols))
         main_part = " | ".join(FormatNumber(row[j + left_cols]) for j in range(main_cols))
         rhs_part = FormatNumber(row[-1])
-        return f"{main_part} || {rhs_part}"
+        return f"{left_part} || {main_part} || {rhs_part}"
 
-    # Format all rows
     formatted_rows = [format_row(tableau[i, :]) for i in range(rows)]
-    line_separator = "=" * len(formatted_rows[0])  # Use the length of a formatted row for alignment
+    line_separator = "=" * len(formatted_rows[0])
 
-    # Assemble the table with separators
     table = [line_separator] + [formatted_rows[0]] + [line_separator] + formatted_rows[1:] + [line_separator]
     
-    # Print the table
     print("\n".join(table))
 
 def PrintSolutions(primal_solutions, dual_solution, value):
