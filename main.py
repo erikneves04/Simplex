@@ -528,12 +528,13 @@ def main():
         value, primal_solutions, dual_solution = ExtractSolutions(tableau, base)
 
         # Imprimindo os resultados
-        PrintSolutions(primal_solutions, dual_solution, value)
         if args.show_tableau or DETAIL:
             PrintDetailText("##############################################################################")
             PrintDetailText("############################### TABLEAU ÓTIMO ################################")
             PrintTableau(tableau)
             PrintDetailText("##############################################################################")
+            PrintDetailText("############################ DADOS DA SOLUÇÃO ################################")
+        PrintSolutions(primal_solutions, dual_solution, value)
 
     except InviableLPException:
         print ("Status: inviavel")
