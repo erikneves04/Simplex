@@ -40,6 +40,10 @@ MATRIX = None # inclui o vetor b a direita
 IS_MAXIMIZATION = False
 SOLUTION_GETTERS = None
 POLICY = None
+DETAIL = False
+
+DECIMALS = 0
+DIGITS = 0
 
 class InviableLPException(Exception):
     """
@@ -66,6 +70,7 @@ def parseArgs():
     parser.add_argument("--digits", type=int, required=False, default=7, help="Número total de dígitos para imprimir valores numéricos.")
     parser.add_argument('--policy', type=Policy, choices=list(Policy), required=False, default= Policy.LARGEST, help='Política adotada para seleção de colunas durante a execução do simplex.')
     parser.add_argument("--show-tableau", type=bool, required=False, default=False, help="Exibe o tableau final.")
+    parser.add_argument("--detail", type=bool, required=False, default=False, help="Exibe todos os passos para resolver a PL.") 
 
     return parser.parse_args()
 
@@ -222,9 +227,16 @@ def GetViableBasis(tableau):
     return base[0:RESTRICTIONS_COUNT]
 
 def AuxiliarPL(tableau, policy):
+    PrintDetailText("########################## AVALIANDO A PL AUXILIAR ###########################")
+
     viable_basis = GetViableBasis(tableau)
     if len(viable_basis) >= RESTRICTIONS_COUNT:
+        PrintDetailText("########################### BASE ÓBVIA ENCONTRADA ############################")
         return tableau, viable_basis
+
+    PrintDetailText("########################## EXECUTANDO A PL AUXILIAR ##########################")
+    PrintDetailText("############################ PL AUXILIAR INICIAL #############################")
+    PrintDetailTableau(tableau)
 
     original_objective_row = tableau[0, :].copy()
     tableau[0, :] = np.zeros(tableau.shape[1])
@@ -241,7 +253,7 @@ def AuxiliarPL(tableau, policy):
     for i in range(1, RESTRICTIONS_COUNT + 1):
         tableau[0, :] -= tableau[i, :]
 
-    tableau, base = Simplex(tableau, base, policy)
+    tableau, base = Simplex(tableau, base, policy, disableLogs=True)
     objective_value = tableau[0, -1]
 
     if not IsNearZero(objective_value):
@@ -260,6 +272,9 @@ def AuxiliarPL(tableau, policy):
         ))
 
     tableau[0, :] = objective_row
+
+    PrintDetailText("############################# PL AUXILIAR FINAL ##############################")
+    PrintDetailTableau(tableau)
 
     return tableau, base
 
@@ -354,14 +369,32 @@ def SelectColumn(tableau, base, policy):
     
     return target_idx + len(base)
 
-def Simplex(tableau, base, policy):
+def Simplex(tableau, base, policy, disableLogs=False):
+    count = 1
+    if not disableLogs:
+        PrintDetailText("##############################################################################")
+        PrintDetailText("############################ EXECUTANDO O SIMPLEX ############################")
+        
+
     while np.any(tableau[0, RESTRICTIONS_COUNT:-1] < 0):
         selected_column = SelectColumn(tableau, base, policy)
         if selected_column == None:
             break
 
+        if not disableLogs:
+            PrintDetailText(f"################################# ITERAÇÃO {count} #################################")
+
         tableau, base = SimplexIteration(tableau, base, selected_column)
         tableau = ReplaceNearZero(tableau)
+
+        if not disableLogs:
+            PrintDetailTableau(tableau)
+
+        count += 1
+
+    if not disableLogs:
+        PrintDetailText("############################# SIMPLEX FINALIZADO #############################")
+        PrintDetailText("##############################################################################")
 
     return tableau, base
 
@@ -404,8 +437,8 @@ def ExtractSolutions(tableau, base):
 
     return value, solutions, dual
 
-def FormatNumber(number, decimals, digits, simple=False):
-    negative_format_string = f"%*.*f" % (digits, decimals, number)
+def FormatNumber(number, simple=False):
+    negative_format_string = f"%*.*f" % (DIGITS, DECIMALS, number)
     positive_format_string = ' ' + negative_format_string
 
     if simple:
@@ -418,15 +451,15 @@ def FormatNumber(number, decimals, digits, simple=False):
     else:
         return positive_format_string.format(number)
 
-def PrintTableau(tableau, decimals, digits):
+def PrintTableau(tableau):
     rows, cols = tableau.shape
     left_cols = rows - 1
     main_cols = cols - left_cols - 1
 
     def format_row(row):
-        left_part = " | ".join(FormatNumber(row[j], decimals, digits) for j in range(left_cols))
-        main_part = " | ".join(FormatNumber(row[j + left_cols], decimals, digits) for j in range(main_cols))
-        rhs_part = FormatNumber(row[-1], decimals, digits)
+        left_part = " | ".join(FormatNumber(row[j]) for j in range(left_cols))
+        main_part = " | ".join(FormatNumber(row[j + left_cols]) for j in range(main_cols))
+        rhs_part = FormatNumber(row[-1])
         return f"{left_part} || {main_part} || {rhs_part}"
 
     formatted_rows = [format_row(tableau[i, :]) for i in range(rows)]
@@ -436,14 +469,14 @@ def PrintTableau(tableau, decimals, digits):
     
     print("\n".join(table))
 
-def PrintSolutions(primal_solutions, dual_solution, value, decimals, digits):
+def PrintSolutions(primal_solutions, dual_solution, value):
 
     if len(primal_solutions) > 1:
         print("Status: otima (multiplos)")
     else:
         print("Status: otima")
 
-    print(f'Objetivo: {FormatNumber(value, decimals, digits, simple=True)}')
+    print(f'Objetivo: {FormatNumber(value, simple=True)}')
 
     if len(primal_solutions) > 1:
         print("Solucoes:")
@@ -451,14 +484,27 @@ def PrintSolutions(primal_solutions, dual_solution, value, decimals, digits):
         print("Solucao:")
 
     for solution in primal_solutions:
-        print(" ".join(FormatNumber(j, decimals, digits, simple=True) for j in solution))
+        print(" ".join(FormatNumber(j, simple=True) for j in solution))
 
     print("Dual:")
-    print(" ".join(FormatNumber(j, decimals, digits, simple=True) for j in dual_solution))
+    print(" ".join(FormatNumber(j, simple=True) for j in dual_solution))
+
+def PrintDetailText(string):
+    if DETAIL:
+        print(string)
+
+def PrintDetailTableau(tableau):
+    if DETAIL:
+        PrintTableau(tableau)
 
 def main():
+    global DETAIL, DECIMALS, DIGITS
+
     # Leitura dos parâmetros
     args = parseArgs()
+    DETAIL = args.detail
+    DECIMALS = args.decimals
+    DIGITS = args.digits
 
     try:
         # Carregandos os dados da PL e colocando em FPI
@@ -467,6 +513,10 @@ def main():
         
         # Criando o tableau estendido
         tableau = ExtendTableau()
+
+        PrintDetailText("############################### TABLEAU INCIAL ###############################")
+        PrintDetailTableau(tableau)
+        PrintDetailText("##############################################################################")
 
         # Busca uma base viável para o problema e avalia quando a viabilidade
         tableau, base = AuxiliarPL(tableau, args.policy) 
@@ -478,9 +528,12 @@ def main():
         value, primal_solutions, dual_solution = ExtractSolutions(tableau, base)
 
         # Imprimindo os resultados
-        PrintSolutions(primal_solutions, dual_solution, value, args.decimals, args.digits)
-        if args.show_tableau:
-            PrintTableau(tableau, args.decimals, args.digits)
+        PrintSolutions(primal_solutions, dual_solution, value)
+        if args.show_tableau or DETAIL:
+            PrintDetailText("##############################################################################")
+            PrintDetailText("############################### TABLEAU ÓTIMO ################################")
+            PrintTableau(tableau)
+            PrintDetailText("##############################################################################")
 
     except InviableLPException:
         print ("Status: inviavel")
