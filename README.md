@@ -64,3 +64,15 @@ ou
 ```plaintext
 Status: ilimitada
 ```
+
+## Testes  
+
+O script possui um conjunto de testes automatizados que verificam a corretude da implementação. Os testes são definidos na pasta `/inputs`, e as saídas esperadas estão em `/expected-outputs`. Caso uma saída gerada não corresponda à esperada, ela será armazenada na pasta `/outputs`.  
+
+Para executar os testes, utilize o comando:  
+
+```bash
+bash test.sh
+```
+
+Caso haja falhas, os resultados divergentes serão salvos em `/outputs` para análise.  
